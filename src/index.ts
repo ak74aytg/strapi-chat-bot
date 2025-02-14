@@ -14,7 +14,7 @@ module.exports = {
       transports: ["websocket", "polling"],
     });
 
-    const serverUserId = 3;
+    const serverUserId = 1;
 
     io.on("connection", (socket) => {
       console.log("A new user has connected", socket.id);
