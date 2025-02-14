@@ -11,6 +11,7 @@ module.exports = {
         methods: ["GET", "POST"],
         credentials: true,
       },
+      transports: ["websocket", "polling"],
     });
 
     const serverUserId = 3;
