@@ -1,20 +1,69 @@
-// import type { Core } from '@strapi/strapi';
+"use strict";
+const { Server } = require("socket.io");
 
-export default {
-  /**
-   * An asynchronous register function that runs before
-   * your application is initialized.
-   *
-   * This gives you an opportunity to extend code.
-   */
-  register(/* { strapi }: { strapi: Core.Strapi } */) {},
+module.exports = {
+  register(/*{ strapi }*/) {},
 
-  /**
-   * An asynchronous bootstrap function that runs before
-   * your application gets started.
-   *
-   * This gives you an opportunity to set up your data model,
-   * run jobs, or perform some special logic.
-   */
-  bootstrap(/* { strapi }: { strapi: Core.Strapi } */) {},
+  bootstrap(/*{ strapi }*/) {
+    const io = new Server(strapi.server.httpServer, {
+      cors: {
+        origin: process.env.FRONTEND_URL,
+        methods: ["GET", "POST"],
+        credentials: true,
+      },
+    });
+
+    const serverUserId = 3;
+
+    io.on("connection", (socket) => {
+      console.log("A new user has connected", socket.id);
+
+      socket.on("message", async (data) => {
+        console.log("Message received:", data);
+
+        try {
+          const userMessage = await strapi.entityService.create("api::message.message", {
+            data: {
+              text: data.text,
+              sender: data.senderId,
+              reciever: data.receiverId,
+              timestamp: new Date(),
+            },
+          });
+
+          console.log("Saved message:", userMessage);
+
+          // Send only to the receiver (excluding sender)
+          io.to(`user:${data.receiverId}`).emit("message", userMessage);
+
+          // **Server Auto-Reply Handling**
+          if (Number(data.receiverId) === serverUserId) {
+            setTimeout(async () => {
+              const serverReply = await strapi.entityService.create("api::message.message", {
+                data: {
+                  text: data.text, // Echo same text
+                  sender: serverUserId,
+                  reciever: data.senderId,
+                  timestamp: new Date(),
+                },
+              });
+
+              io.to(`user:${data.senderId}`).emit("message", serverReply);
+            }, 1000);
+          }
+        } catch (error) {
+          console.error("Error saving message:", error);
+        }
+      });
+
+      socket.on("join", (userId) => {
+        socket.join(`user:${userId}`);
+        console.log(`User ${userId} joined room user:${userId}`);
+      });
+
+      socket.on("disconnect", () => {
+        console.log("A user has disconnected", socket.id);
+      });
+    });
+  },
 };
